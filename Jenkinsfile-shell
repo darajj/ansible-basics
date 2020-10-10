@@ -1,28 +1,32 @@
-def myVar
+def lastcommit
 pipeline {
+	environment{
+	    def folder=""
+	    def file=""
+	}
     agent any
     stages {
         stage('Build-Image') {
             steps {
-              withCredentials([usernameColonPassword(credentialsId: 'admin', variable: 'admin')]){
-	        sh '''
-		set +x
-                output=`curl  http://192.168.15.141:8080/job/dev-pipeline/lastSuccessfulBuild/api/json --user "$admin"`
+              withCredentials([usernameColonPassword(credentialsId: '11b18953463bd152679d0c6e87baee6176', variable: 'admin')]){
+				sh '''
+				set +x
+                output=`curl  https://jenkins.devops.sce.com/job/testfolder/job/t/lastSuccessfulBuild/api/json --user "$admin"`
                 commit_id=`echo $output | awk -F "SHA1" '{print $2}' | awk -F "," '{print $1}'| awk -F ":" '{print $2}' | sed 's/"//g'`
                 echo $commit_id > commit.txt
                 '''
-		}
+				}
                 script {
-                 myVar = readFile('commit.txt').trim()
-               }
-                  echo "${myVar}"
-            }
+                 lastcommit = readFile('commit.txt').trim()
+				}
+				cleanWs()
+				git changelog: false, branch: 'master' , credentialsId: '42034968-cdcb-46fc-b72d-1a92c7e3c577', poll: false, url: 'https://github.com/EdisonInternational/sce-ent-cronacle.git'
+				sh "cp /apps/redwood/redwoodScript . && mkdir Main"
+				sh "bash redwoodScript $commitID"  
+				sh "cp /apps/redwood/redwood.sh $WORKSPACE/Main/redwood.sh"
+				sh "cd $WORKSPACE/Main/ && bash redwood.sh"
+				nexusArtifactUploader artifacts: [[artifactId: 'artifact', classifier: '', file: '/apps/jenkins/workspace/testfolder/t/Artifact.zip', type: 'zip']], credentialsId: 'cd9aa082-0fd7-45d7-981d-0309a5aba800', groupId: 'test', nexusUrl: 'nexus.devops.sce.com:8081', nexusVersion: 'nexus3', protocol: 'https', repository: 'redwood_test', version:'$BUILD_NUMBER'
+				} 
         }
-        
-        stage ("Deploy to Production"){
-              steps {
-                echo "${myVar}"
-               }
-         }
-    }
-}
+	}
+}        
